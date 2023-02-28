@@ -1008,9 +1008,6 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'close_profit_pct': None,
         'close_profit_abs': None,
         'close_rate': None,
-        'current_profit': ANY,
-        'current_profit_pct': ANY,
-        'current_profit_abs': ANY,
         'profit_ratio': ANY,
         'profit_pct': ANY,
         'profit_abs': ANY,
@@ -1803,8 +1800,8 @@ def test_health(botclient):
 
     assert_response(rc)
     ret = rc.json()
-    assert ret['last_process_ts'] == 0
-    assert ret['last_process'] == '1970-01-01T00:00:00+00:00'
+    assert ret["last_process_ts"] is None
+    assert ret["last_process"] is None
 
 
 def test_api_ws_subscribe(botclient, mocker):
