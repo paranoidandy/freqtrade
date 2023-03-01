@@ -30,9 +30,9 @@ from freqtrade.persistence.models import Order
 from freqtrade.rpc import RPC
 from freqtrade.rpc.rpc import RPCException
 from freqtrade.rpc.telegram import Telegram, authorized_only
-from tests.conftest import (CURRENT_TEST_STRATEGY, create_mock_trades, create_mock_trades_usdt,
-                            get_patched_freqtradebot, log_has, log_has_re, patch_exchange,
-                            patch_get_signal, patch_whitelist)
+from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades,
+                            create_mock_trades_usdt, get_patched_freqtradebot, log_has, log_has_re,
+                            patch_exchange, patch_get_signal, patch_whitelist)
 
 
 class DummyCls(Telegram):
@@ -204,6 +204,8 @@ def test_telegram_status(default_conf, update, mocker) -> None:
             'profit': -0.0059,
             'profit_ratio': -0.0059,
             'profit_abs': -0.225,
+            'realized_profit': 0.0,
+            'total_profit_abs': -0.225,
             'initial_stop_loss_abs': 1.098e-05,
             'stop_loss_abs': 1.099e-05,
             'exit_order_status': None,
@@ -238,7 +240,7 @@ def test_telegram_status_multi_entry(default_conf, update, mocker, fee) -> None:
     default_conf['telegram']['chat_id'] = "123"
     default_conf['position_adjustment_enable'] = True
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_order=MagicMock(return_value=None),
         get_rate=MagicMock(return_value=0.22),
     )
@@ -290,7 +292,7 @@ def test_telegram_status_closed_trade(default_conf, update, mocker, fee) -> None
     default_conf['telegram']['chat_id'] = "123"
     default_conf['position_adjustment_enable'] = True
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_order=MagicMock(return_value=None),
         get_rate=MagicMock(return_value=0.22),
     )
@@ -312,7 +314,7 @@ def test_telegram_status_closed_trade(default_conf, update, mocker, fee) -> None
 def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
     default_conf['max_open_trades'] = 3
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
         _dry_is_price_crossed=MagicMock(return_value=True),
@@ -389,7 +391,7 @@ def test_status_handle(default_conf, update, ticker, fee, mocker) -> None:
 
 def test_status_table_handle(default_conf, update, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -434,7 +436,7 @@ def test_daily_handle(default_conf_usdt, update, ticker, fee, mocker, time_machi
         return_value=1.1
     )
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -489,7 +491,7 @@ def test_daily_handle(default_conf_usdt, update, ticker, fee, mocker, time_machi
 
 def test_daily_wrong_input(default_conf, update, ticker, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker
     )
 
@@ -523,7 +525,7 @@ def test_weekly_handle(default_conf_usdt, update, ticker, fee, mocker, time_mach
         return_value=1.1
     )
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -593,7 +595,7 @@ def test_monthly_handle(default_conf_usdt, update, ticker, fee, mocker, time_mac
         return_value=1.1
     )
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -674,7 +676,7 @@ def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell_up, f
                        limit_sell_order_usdt, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=1.1)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker_usdt,
         get_fee=fee,
     )
@@ -704,7 +706,7 @@ def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell_up, f
     msg_mock.reset_mock()
 
     # Update the ticker with a market going up
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', ticker_sell_up)
+    mocker.patch(f'{EXMS}.fetch_ticker', ticker_sell_up)
     # Simulate fulfilled LIMIT_SELL order for trade
     oobj = Order.parse_from_ccxt_object(
         limit_sell_order_usdt, limit_sell_order_usdt['symbol'], 'sell')
@@ -737,7 +739,7 @@ def test_profit_handle(default_conf_usdt, update, ticker_usdt, ticker_sell_up, f
 def test_telegram_stats(default_conf, update, ticker, fee, mocker, is_short) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -762,10 +764,9 @@ def test_telegram_stats(default_conf, update, ticker, fee, mocker, is_short) -> 
 
 def test_telegram_balance_handle(default_conf, update, mocker, rpc_balance, tickers) -> None:
     default_conf['dry_run'] = False
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value=rpc_balance)
-    mocker.patch('freqtrade.exchange.Exchange.get_tickers', tickers)
-    mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
-                 side_effect=lambda a, b: f"{a}/{b}")
+    mocker.patch(f'{EXMS}.get_balances', return_value=rpc_balance)
+    mocker.patch(f'{EXMS}.get_tickers', tickers)
+    mocker.patch(f'{EXMS}.get_valid_pair_combination', side_effect=lambda a, b: f"{a}/{b}")
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)
@@ -788,7 +789,7 @@ def test_telegram_balance_handle(default_conf, update, mocker, rpc_balance, tick
 
 def test_balance_handle_empty_response(default_conf, update, mocker) -> None:
     default_conf['dry_run'] = False
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value={})
+    mocker.patch(f'{EXMS}.get_balances', return_value={})
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)
@@ -801,7 +802,7 @@ def test_balance_handle_empty_response(default_conf, update, mocker) -> None:
 
 
 def test_balance_handle_empty_response_dry(default_conf, update, mocker) -> None:
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value={})
+    mocker.patch(f'{EXMS}.get_balances', return_value={})
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)
@@ -929,7 +930,7 @@ def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
     patch_exchange(mocker)
     patch_whitelist(mocker, default_conf)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
         _dry_is_price_crossed=MagicMock(return_value=True),
@@ -947,7 +948,7 @@ def test_telegram_forceexit_handle(default_conf, update, ticker, fee,
     assert trade
 
     # Increase the price and sell it
-    mocker.patch('freqtrade.exchange.Exchange.fetch_ticker', ticker_sell_up)
+    mocker.patch(f'{EXMS}.fetch_ticker', ticker_sell_up)
 
     # /forceexit 1
     context = MagicMock()
@@ -998,7 +999,7 @@ def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee,
     patch_whitelist(mocker, default_conf)
 
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
         _dry_is_price_crossed=MagicMock(return_value=True),
@@ -1014,7 +1015,7 @@ def test_telegram_force_exit_down_handle(default_conf, update, ticker, fee,
 
     # Decrease the price and sell it
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker_sell_down
     )
 
@@ -1069,7 +1070,7 @@ def test_forceexit_all_handle(default_conf, update, ticker, fee, mocker) -> None
     mocker.patch('freqtrade.rpc.telegram.Telegram._init', MagicMock())
     patch_whitelist(mocker, default_conf)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
         _dry_is_price_crossed=MagicMock(return_value=True),
@@ -1154,7 +1155,7 @@ def test_forceexit_handle_invalid(default_conf, update, mocker) -> None:
 def test_force_exit_no_pair(default_conf, update, ticker, fee, mocker) -> None:
     default_conf['max_open_trades'] = 4
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
         _dry_is_price_crossed=MagicMock(return_value=True),
@@ -1281,7 +1282,7 @@ def test_force_enter_no_pair(default_conf, update, mocker) -> None:
 def test_telegram_performance_handle(default_conf_usdt, update, ticker, fee, mocker) -> None:
 
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1299,7 +1300,7 @@ def test_telegram_performance_handle(default_conf_usdt, update, ticker, fee, moc
 def test_telegram_entry_tag_performance_handle(
         default_conf_usdt, update, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1330,7 +1331,7 @@ def test_telegram_entry_tag_performance_handle(
 def test_telegram_exit_reason_performance_handle(default_conf_usdt, update, ticker, fee,
                                                  mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1361,7 +1362,7 @@ def test_telegram_exit_reason_performance_handle(default_conf_usdt, update, tick
 def test_telegram_mix_tag_performance_handle(default_conf_usdt, update, ticker, fee,
                                              mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1393,7 +1394,7 @@ def test_telegram_mix_tag_performance_handle(default_conf_usdt, update, ticker, 
 
 def test_count_handle(default_conf, update, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1422,7 +1423,7 @@ def test_count_handle(default_conf, update, ticker, fee, mocker) -> None:
 
 def test_telegram_lock_handle(default_conf, update, ticker, fee, mocker) -> None:
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
         get_fee=fee,
     )
@@ -1490,7 +1491,7 @@ def test_whitelist_static(default_conf, update, mocker) -> None:
 
 
 def test_whitelist_dynamic(default_conf, update, mocker) -> None:
-    mocker.patch('freqtrade.exchange.Exchange.exchange_has', MagicMock(return_value=True))
+    mocker.patch(f'{EXMS}.exchange_has', return_value=True)
     default_conf['pairlists'] = [{'method': 'VolumePairList',
                                   'number_assets': 4
                                   }]
@@ -1684,7 +1685,7 @@ def test_telegram_delete_trade(mocker, update, default_conf, fee, is_short):
 def test_telegram_delete_open_order(mocker, update, default_conf, fee, is_short, ticker):
 
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         fetch_ticker=ticker,
     )
     telegram, _, msg_mock = get_telegram_testobject(mocker, default_conf)
@@ -1705,8 +1706,7 @@ def test_telegram_delete_open_order(mocker, update, default_conf, fee, is_short,
     msg_mock.reset_mock()
 
     trade = Trade.get_trades([Trade.id == 6]).first()
-    mocker.patch('freqtrade.exchange.Exchange.fetch_order',
-                 return_value=trade.orders[-1].to_ccxt_object())
+    mocker.patch(f'{EXMS}.fetch_order', return_value=trade.orders[-1].to_ccxt_object())
     context = MagicMock()
     context.args = [6]
     telegram._cancel_open_order(update=update, context=context)

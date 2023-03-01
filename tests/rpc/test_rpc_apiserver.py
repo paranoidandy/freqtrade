@@ -24,7 +24,7 @@ from freqtrade.rpc import RPC
 from freqtrade.rpc.api_server import ApiServer
 from freqtrade.rpc.api_server.api_auth import create_token, get_user_from_token
 from freqtrade.rpc.api_server.uvicorn_threaded import UvicornServer
-from tests.conftest import (CURRENT_TEST_STRATEGY, create_mock_trades, get_mock_coro,
+from tests.conftest import (CURRENT_TEST_STRATEGY, EXMS, create_mock_trades, get_mock_coro,
                             get_patched_freqtradebot, log_has, log_has_re, patch_get_signal)
 
 
@@ -473,9 +473,9 @@ def test_api_balance(botclient, mocker, rpc_balance, tickers):
     ftbot, client = botclient
 
     ftbot.config['dry_run'] = False
-    mocker.patch('freqtrade.exchange.Exchange.get_balances', return_value=rpc_balance)
-    mocker.patch('freqtrade.exchange.Exchange.get_tickers', tickers)
-    mocker.patch('freqtrade.exchange.Exchange.get_valid_pair_combination',
+    mocker.patch(f'{EXMS}.get_balances', return_value=rpc_balance)
+    mocker.patch(f'{EXMS}.get_tickers', tickers)
+    mocker.patch(f'{EXMS}.get_valid_pair_combination',
                  side_effect=lambda a, b: f"{a}/{b}")
     ftbot.wallets.update()
 
@@ -507,7 +507,7 @@ def test_api_count(botclient, mocker, ticker, fee, markets, is_short):
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -594,7 +594,7 @@ def test_api_daily(botclient, mocker, ticker, fee, markets):
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -613,7 +613,7 @@ def test_api_trades(botclient, mocker, fee, markets, is_short):
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         markets=PropertyMock(return_value=markets)
     )
     rc = client_get(client, f"{BASE_URI}/trades")
@@ -644,7 +644,7 @@ def test_api_trade_single(botclient, mocker, fee, ticker, markets, is_short):
     ftbot, client = botclient
     patch_get_signal(ftbot, enter_long=not is_short, enter_short=is_short)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         markets=PropertyMock(return_value=markets),
         fetch_ticker=ticker,
     )
@@ -668,7 +668,7 @@ def test_api_delete_trade(botclient, mocker, fee, markets, is_short):
     stoploss_mock = MagicMock()
     cancel_mock = MagicMock()
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         markets=PropertyMock(return_value=markets),
         cancel_order=cancel_mock,
         cancel_stoploss_order=stoploss_mock,
@@ -713,7 +713,7 @@ def test_api_delete_open_order(botclient, mocker, fee, markets, ticker, is_short
     stoploss_mock = MagicMock()
     cancel_mock = MagicMock()
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         markets=PropertyMock(return_value=markets),
         fetch_ticker=ticker,
         cancel_order=cancel_mock,
@@ -731,15 +731,13 @@ def test_api_delete_open_order(botclient, mocker, fee, markets, ticker, is_short
     assert_response(rc, 502)
     assert 'No open order for trade_id' in rc.json()['error']
     trade = Trade.get_trades([Trade.id == 6]).first()
-    mocker.patch('freqtrade.exchange.Exchange.fetch_order',
-                 side_effect=ExchangeError)
+    mocker.patch(f'{EXMS}.fetch_order', side_effect=ExchangeError)
     rc = client_delete(client, f"{BASE_URI}/trades/6/open-order")
     assert_response(rc, 502)
     assert 'Order not found.' in rc.json()['error']
 
     trade = Trade.get_trades([Trade.id == 6]).first()
-    mocker.patch('freqtrade.exchange.Exchange.fetch_order',
-                 return_value=trade.orders[-1].to_ccxt_object())
+    mocker.patch(f'{EXMS}.fetch_order', return_value=trade.orders[-1].to_ccxt_object())
 
     rc = client_delete(client, f"{BASE_URI}/trades/6/open-order")
     assert_response(rc)
@@ -782,7 +780,7 @@ def test_api_edge_disabled(botclient, mocker, ticker, fee, markets):
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -844,7 +842,7 @@ def test_api_profit(botclient, mocker, ticker, fee, markets, is_short, expected)
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -902,7 +900,7 @@ def test_api_stats(botclient, mocker, ticker, fee, markets, is_short):
     ftbot, client = botclient
     patch_get_signal(ftbot, enter_long=not is_short, enter_short=is_short)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -983,7 +981,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
     ftbot, client = botclient
     patch_get_signal(ftbot)
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -1012,6 +1010,8 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'profit_pct': ANY,
         'profit_abs': ANY,
         'profit_fiat': ANY,
+        'total_profit_abs': ANY,
+        'total_profit_fiat': ANY,
         'realized_profit': 0.0,
         'current_rate': current_rate,
         'open_date': ANY,
@@ -1066,7 +1066,7 @@ def test_api_status(botclient, mocker, ticker, fee, markets, is_short,
         'orders': [ANY],
     }
 
-    mocker.patch('freqtrade.exchange.Exchange.get_rate',
+    mocker.patch(f'{EXMS}.get_rate',
                  MagicMock(side_effect=ExchangeError("Pair 'ETH/BTC' not available")))
 
     rc = client_get(client, f"{BASE_URI}/status")
@@ -1274,7 +1274,7 @@ def test_api_force_entry(botclient, mocker, fee, endpoint):
 def test_api_forceexit(botclient, mocker, ticker, fee, markets):
     ftbot, client = botclient
     mocker.patch.multiple(
-        'freqtrade.exchange.Exchange',
+        EXMS,
         get_balances=MagicMock(return_value=ticker),
         fetch_ticker=ticker,
         get_fee=fee,
@@ -1629,7 +1629,7 @@ def test_sysinfo(botclient):
 
 def test_api_backtesting(botclient, mocker, fee, caplog, tmpdir):
     ftbot, client = botclient
-    mocker.patch('freqtrade.exchange.Exchange.get_fee', fee)
+    mocker.patch(f'{EXMS}.get_fee', fee)
 
     rc = client_get(client, f"{BASE_URI}/backtest")
     # Backtest prevented in default mode
