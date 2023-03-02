@@ -1155,6 +1155,8 @@ class Backtesting:
         while current_time <= end_date:
             open_trade_count_start = LocalTrade.bt_open_open_trade_count
             self.check_abort()
+            # TODO: implelement bot_loop_start() on every candle
+            strategy_safe_wrapper(self.strategy.bot_loop_start, supress_error=True)()
             for i, pair in enumerate(data):
                 row_index = indexes[pair]
                 row = self.validate_row(data, pair, row_index, current_time)
