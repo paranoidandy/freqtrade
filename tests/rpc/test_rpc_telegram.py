@@ -279,6 +279,7 @@ def test_telegram_status_multi_entry(default_conf, update, mocker, fee) -> None:
     assert msg_mock.call_count == 4
     msg = msg_mock.call_args_list[0][0][0]
     assert re.search(r'Number of Entries.*2', msg)
+    assert re.search(r'Number of Exits.*0', msg)
     assert re.search(r'Average Entry Price', msg)
     assert re.search(r'Order filled', msg)
     assert re.search(r'Close Date:', msg) is None
@@ -1209,7 +1210,7 @@ def test_force_enter_handle(default_conf, update, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
 
     fbuy_mock = MagicMock(return_value=None)
-    mocker.patch('freqtrade.rpc.RPC._rpc_force_entry', fbuy_mock)
+    mocker.patch('freqtrade.rpc.rpc.RPC._rpc_force_entry', fbuy_mock)
 
     telegram, freqtradebot, _ = get_telegram_testobject(mocker, default_conf)
     patch_get_signal(freqtradebot)
@@ -1226,7 +1227,7 @@ def test_force_enter_handle(default_conf, update, mocker) -> None:
 
     # Reset and retry with specified price
     fbuy_mock = MagicMock(return_value=None)
-    mocker.patch('freqtrade.rpc.RPC._rpc_force_entry', fbuy_mock)
+    mocker.patch('freqtrade.rpc.rpc.RPC._rpc_force_entry', fbuy_mock)
     # /forcelong ETH/BTC 0.055
     context = MagicMock()
     context.args = ["ETH/BTC", "0.055"]
@@ -1255,7 +1256,7 @@ def test_force_enter_no_pair(default_conf, update, mocker) -> None:
     mocker.patch('freqtrade.rpc.rpc.CryptoToFiatConverter._find_price', return_value=15000.0)
 
     fbuy_mock = MagicMock(return_value=None)
-    mocker.patch('freqtrade.rpc.RPC._rpc_force_entry', fbuy_mock)
+    mocker.patch('freqtrade.rpc.rpc.RPC._rpc_force_entry', fbuy_mock)
 
     telegram, freqtradebot, msg_mock = get_telegram_testobject(mocker, default_conf)
 
