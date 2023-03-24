@@ -4,6 +4,7 @@ from unittest.mock import ANY, MagicMock, PropertyMock
 
 import pytest
 from numpy import isnan
+from sqlalchemy import select
 
 from freqtrade.edge import PairInfo
 from freqtrade.enums import SignalDirection, State, TradingMode
@@ -124,17 +125,6 @@ def test_rpc_trade_status(default_conf, ticker, fee, mocker) -> None:
         'profit_pct': 0.0,
         'profit_abs': 0.0,
         'total_profit_abs': 0.0,
-        'stop_loss_abs': 0.0,
-        'stop_loss_pct': None,
-        'stop_loss_ratio': None,
-        'stoploss_current_dist': -1.099e-05,
-        'stoploss_current_dist_ratio': -1.0,
-        'stoploss_current_dist_pct': pytest.approx(-100.0),
-        'stoploss_entry_dist': -0.0010025,
-        'stoploss_entry_dist_ratio': -1.0,
-        'initial_stop_loss_abs': 0.0,
-        'initial_stop_loss_pct': None,
-        'initial_stop_loss_ratio': None,
         'open_order': '(limit buy rem=91.07468123)',
     })
     response_unfilled['orders'][0].update({
@@ -354,7 +344,7 @@ def test_rpc_delete_trade(mocker, default_conf, fee, markets, caplog, is_short):
     with pytest.raises(RPCException, match='invalid argument'):
         rpc._rpc_delete('200')
 
-    trades = Trade.query.all()
+    trades = Trade.session.scalars(select(Trade)).all()
     trades[1].stoploss_order_id = '1234'
     trades[2].stoploss_order_id = '1234'
     assert len(trades) > 2
@@ -717,7 +707,7 @@ def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     mocker.patch(f'{EXMS}._dry_is_price_crossed', MagicMock(return_value=False))
     freqtradebot.enter_positions()
     # make an limit-buy open trade
-    trade = Trade.query.filter(Trade.id == '3').first()
+    trade = Trade.session.scalars(select(Trade).filter(Trade.id == '3')).first()
     filled_amount = trade.amount / 2
     # Fetch order - it's open first, and closed after cancel_order is called.
     mocker.patch(
@@ -753,7 +743,7 @@ def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
 
     freqtradebot.config['max_open_trades'] = 3
     freqtradebot.enter_positions()
-    trade = Trade.query.filter(Trade.id == '2').first()
+    trade = Trade.session.scalars(select(Trade).filter(Trade.id == '2')).first()
     amount = trade.amount
     # make an limit-buy open trade, if there is no 'filled', don't sell it
     mocker.patch(
@@ -771,7 +761,7 @@ def test_rpc_force_exit(default_conf, ticker, fee, mocker) -> None:
     assert cancel_order_mock.call_count == 2
     assert trade.amount == amount
 
-    trade = Trade.query.filter(Trade.id == '3').first()
+    trade = Trade.session.scalars(select(Trade).filter(Trade.id == '3')).first()
 
     # make an limit-sell open trade
     mocker.patch(
